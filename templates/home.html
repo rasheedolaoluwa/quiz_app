@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+</head>
+<body>
+    <h2>Welcome, {{ current_user.username }}!</h2>
+    <a href="{{ url_for('create_quiz') }}">Create a New Quiz</a>
+    <h3>Your Quizzes</h3>
+    <ul>
+        {% for quiz in quizzes %}
+            <li>
+                {{ quiz.title }} - 
+                <a href="{{ url_for('add_question', quiz_id=quiz.id) }}">Add Question</a> | 
+                <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}">Take Quiz</a>
+            </li>
+        {% endfor %}
+    </ul>    
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

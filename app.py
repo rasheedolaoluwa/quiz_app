@@ -72,6 +72,21 @@ def register():
             return redirect(url_for('login'))
     return render_template('register.html')
 
+@app.route('/add_question/<int:quiz_id>', methods=['GET', 'POST'])
+@login_required
+def add_question(quiz_id):
+    quiz = Quiz.query.get_or_404(quiz_id)
+    if request.method == 'POST':
+        question_text = request.form['question_text']
+        correct_answer = request.form['correct_answer']
+        # Create a new question and add it to the selected quiz
+        new_question = Question(quiz_id=quiz.id, text=question_text, correct_answer=correct_answer)
+        db.session.add(new_question)
+        db.session.commit()
+        flash('Question added successfully!')
+        return redirect(url_for('home'))
+    return render_template('add_question.html', quiz=quiz)
+
 @app.route('/create_quiz', methods=['GET', 'POST'])
 @login_required
 def create_quiz():
@@ -84,6 +99,21 @@ def create_quiz():
         return redirect(url_for('home'))
     return render_template('create_quiz.html')
 
+@app.route('/take_quiz/<int:quiz_id>', methods=['GET', 'POST'])
+@login_required
+def take_quiz(quiz_id):
+    quiz = Quiz.query.get_or_404(quiz_id)
+    questions = Question.query.filter_by(quiz_id=quiz.id).all()
+    if request.method == 'POST':
+        score = 0
+        for question in questions:
+            user_answer = request.form.get(f'question_{question.id}')
+            if user_answer and user_answer.lower() == question.correct_answer.lower():
+                score += 1
+        flash(f'You scored {score} out of {len(questions)}')
+        return redirect(url_for('home'))
+    return render_template('take_quiz.html', quiz=quiz, questions=questions)
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -93,7 +123,8 @@ def logout():
 @app.route('/')
 @login_required
 def home():
-    return "Welcome to the Interactive Quiz Application!"
+    quizzes = Quiz.query.all()
+    return render_template('home.html', quizzes=quizzes)
 
 if __name__ == '__main__':
     with app.app_context():
