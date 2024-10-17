@@ -1,6 +1,11 @@
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'nigeriawillbegreat'
@@ -20,7 +25,18 @@ def load_user(user_id):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), nullable=False, unique=True)
-    password = db.Column(db.String(150), nullable=False)
+    password_hash = db.Column(db.String(150), nullable=False)
+
+    @property
+    def password(self):
+        raise AttributeError('Password is not a readable attribute.')
+
+    @password.setter
+    def password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def verify_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 # Define Quiz Model
 class Quiz(db.Model):
@@ -30,9 +46,13 @@ class Quiz(db.Model):
 # Define Question Model
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
     text = db.Column(db.String(500), nullable=False)
     correct_answer = db.Column(db.String(150), nullable=False)
+    option_a = db.Column(db.String(150), nullable=False)
+    option_b = db.Column(db.String(150), nullable=False)
+    option_c = db.Column(db.String(150), nullable=False)
+    option_d = db.Column(db.String(150), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
 
 # Define Answer Choice Model
 class AnswerChoice(db.Model):
@@ -41,36 +61,51 @@ class AnswerChoice(db.Model):
     text = db.Column(db.String(150), nullable=False)
     is_correct = db.Column(db.Boolean, default=False)
 
+# Define a Registration Form class
+class RegistrationForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=15)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Register')
+
+    def validate_username(self, username):
+        user = User.query.filter_by(username=username.data).first()
+        if user:
+            raise ValidationError('That username is already taken. Please choose a different one.')
+
+# Define Quiz Result Class
+class QuizResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
-        if user and user.password == password:
+        if user and user.verify_password(password):
             login_user(user)
+            flash('Login successful!', 'success')
             return redirect(url_for('home'))
         else:
-             flash('Invalid credentials. Please try again.')
+            flash('Invalid credentials. Please try again.', 'danger')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        # Check if the user already exists
-        existing_user = User.query.filter_by(username=username).first()
-        if existing_user:
-            flash('Username already exists. Please choose a different one.')
-        else:
-            # Create a new user
-            new_user = User(username=username, password=password)
-            db.session.add(new_user)
-            db.session.commit()
-            flash('Registration successful! Please log in.')
-            return redirect(url_for('login'))
-    return render_template('register.html')
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        new_user = User(username=form.username.data)
+        new_user.password = form.password.data  # This will hash the password
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Registration successful! Please log in.', 'success')
+        return redirect(url_for('login'))
+    return render_template('register.html', form=form)
 
 @app.route('/add_question/<int:quiz_id>', methods=['GET', 'POST'])
 @login_required
@@ -78,13 +113,27 @@ def add_question(quiz_id):
     quiz = Quiz.query.get_or_404(quiz_id)
     if request.method == 'POST':
         question_text = request.form['question_text']
+        option_a = request.form['option_a']
+        option_b = request.form['option_b']
+        option_c = request.form['option_c']
+        option_d = request.form['option_d']
         correct_answer = request.form['correct_answer']
-        # Create a new question and add it to the selected quiz
-        new_question = Question(quiz_id=quiz.id, text=question_text, correct_answer=correct_answer)
+
+        # Create the question with all options provided
+        new_question = Question(
+            text=question_text,
+            correct_answer=correct_answer,
+            option_a=option_a,
+            option_b=option_b,
+            option_c=option_c,
+            option_d=option_d,
+            quiz_id=quiz.id
+        )
         db.session.add(new_question)
         db.session.commit()
-        flash('Question added successfully!')
+        flash('Question added successfully!', 'success')
         return redirect(url_for('home'))
+    
     return render_template('add_question.html', quiz=quiz)
 
 @app.route('/create_quiz', methods=['GET', 'POST'])
@@ -104,14 +153,24 @@ def create_quiz():
 def take_quiz(quiz_id):
     quiz = Quiz.query.get_or_404(quiz_id)
     questions = Question.query.filter_by(quiz_id=quiz.id).all()
+
     if request.method == 'POST':
         score = 0
+        total_questions = len(questions)
         for question in questions:
             user_answer = request.form.get(f'question_{question.id}')
-            if user_answer and user_answer.lower() == question.correct_answer.lower():
+            if user_answer and user_answer.strip().lower() == question.correct_answer.lower():
                 score += 1
-        flash(f'You scored {score} out of {len(questions)}')
+
+        # Save quiz result to the database
+        result = QuizResult(user_id=current_user.id, quiz_id=quiz_id, score=score)
+        db.session.add(result)
+        db.session.commit()
+
+        # Flash feedback to the user
+        flash(f'You scored {score} out of {total_questions}', 'success')
         return redirect(url_for('home'))
+
     return render_template('take_quiz.html', quiz=quiz, questions=questions)
 
 @app.route('/logout')

@@ -3,20 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <title>Take Quiz</title>
+    <script>
+        // Countdown Timer Script
+        let timeLeft = 120; // Set time limit in seconds (e.g., 120 seconds = 2 minutes)
+        function countdown() {
+            if (timeLeft <= 0) {
+                document.getElementById("quizForm").submit(); // Submit form when timer ends
+            } else {
+                document.getElementById("timer").innerHTML = timeLeft + " seconds remaining";
+                timeLeft -= 1;
+                setTimeout(countdown, 1000);
+            }
+        }
+        window.onload = countdown; // Start the countdown when the page loads
+    </script>
 </head>
-<body>
-    <h2>Take the Quiz: "{{ quiz.title }}"</h2>
-    <form method="POST">
+<body class="container mt-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} mt-3">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <h2 class="mb-4">Take the Quiz: "{{ quiz.title }}"</h2>
+    <div id="timer" class="mb-4 text-danger font-weight-bold"></div>
+    <form method="POST" id="quizForm" class="w-75">
         {% for question in questions %}
-            <div>
+            <div class="form-group">
                 <p>{{ loop.index }}. {{ question.text }}</p>
-                <label for="question_{{ question.id }}">Your Answer:</label>
-                <input type="text" id="question_{{ question.id }}" name="question_{{ question.id }}" required><br><br>
+                <div>
+                    <input type="radio" id="option_a_{{ question.id }}" name="question_{{ question.id }}" value="A">
+                    <label for="option_a_{{ question.id }}">{{ question.option_a }}</label>
+                </div>
+                <div>
+                    <input type="radio" id="option_b_{{ question.id }}" name="question_{{ question.id }}" value="B">
+                    <label for="option_b_{{ question.id }}">{{ question.option_b }}</label>
+                </div>
+                <div>
+                    <input type="radio" id="option_c_{{ question.id }}" name="question_{{ question.id }}" value="C">
+                    <label for="option_c_{{ question.id }}">{{ question.option_c }}</label>
+                </div>
+                <div>
+                    <input type="radio" id="option_d_{{ question.id }}" name="question_{{ question.id }}" value="D">
+                    <label for="option_d_{{ question.id }}">{{ question.option_d }}</label>
+                </div>
             </div>
         {% endfor %}
-        <button type="submit">Submit Quiz</button>
+        <button type="submit" class="btn btn-primary">Submit Quiz</button>
     </form>
-    <a href="{{ url_for('home') }}">Go back to Home</a>
+    <a href="{{ url_for('home') }}" class="d-block mt-3">Go back to Home</a>
 </body>
 </html>
