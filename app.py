@@ -81,6 +81,9 @@ class QuizResult(db.Model):
     score = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+    user = db.relationship('User', backref='results')
+    quiz = db.relationship('Quiz', backref='results')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -106,6 +109,22 @@ def register():
         flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('login'))
     return render_template('register.html', form=form)
+
+@app.route('/my_results')
+@login_required
+def my_results():
+    results = QuizResult.query.filter_by(user_id=current_user.id).join(Quiz).add_columns(
+        Quiz.title, QuizResult.score, QuizResult.timestamp
+    ).all()
+    return render_template('my_results.html', results=results)
+
+@app.route('/leaderboard/<int:quiz_id>')
+def leaderboard(quiz_id):
+    quiz = Quiz.query.get_or_404(quiz_id)
+    top_results = QuizResult.query.filter_by(quiz_id=quiz_id).join(User).add_columns(
+        User.username, QuizResult.score, QuizResult.timestamp
+    ).order_by(QuizResult.score.desc()).limit(10).all()
+    return render_template('leaderboard.html', quiz=quiz, top_results=top_results)
 
 @app.route('/add_question/<int:quiz_id>', methods=['GET', 'POST'])
 @login_required

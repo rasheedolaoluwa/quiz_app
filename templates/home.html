@@ -24,10 +24,12 @@
                 <span>
                     <a href="{{ url_for('add_question', quiz_id=quiz.id) }}" class="btn btn-info btn-sm">Add Question</a>
                     <a href="{{ url_for('take_quiz', quiz_id=quiz.id) }}" class="btn btn-primary btn-sm">Take Quiz</a>
+                    <a href="{{ url_for('leaderboard', quiz_id=quiz.id) }}" class="btn btn-success btn-sm">View Leaderboard</a>
                 </span>
             </li>
         {% endfor %}
     </ul>
-    <a href="{{ url_for('logout') }}" class="btn btn-danger mt-4">Logout</a>
+    <a href="{{ url_for('my_results') }}" class="btn btn-secondary mt-4">View My Quiz Results</a>
+    <a href="{{ url_for('logout') }}" class="btn btn-danger mt-4">Logout</a>    
 </body>
 </html>
