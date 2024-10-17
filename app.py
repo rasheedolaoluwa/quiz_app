@@ -6,9 +6,10 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
 from datetime import datetime
+import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'nigeriawillbegreat'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quiz_app.db'
 db = SQLAlchemy(app)
 
